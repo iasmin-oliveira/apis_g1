@@ -1,0 +1,22 @@
+{
+  "name": "atividade_g1_apis",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/iasmin-oliveira/apis_g1.git"
+  },
+  "author": "iasmin h. o.",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iasmin-oliveira/apis_g1/issues"
+  },
+  "homepage": "https://github.com/iasmin-oliveira/apis_g1#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
