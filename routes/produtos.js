@@ -1,46 +1,43 @@
 const express = require('express');
+const { authMiddleware, authorizeRoles } = require('../middleware/auth');
+
 const router = express.Router();
-let produtos = require('../data/produtos');
 
-// Listar todos os produtos
-router.get('/', (req, res) => {
-  res.json(produtos);
-});
+let produtos = [];
+let lastId = 0;
 
-// Buscar produto por ID
+// listar (público)
+router.get('/', (req, res) => res.json(produtos));
+
+// buscar por id (público)
 router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const produto = produtos.find(p => p.id === id);
-  if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-  res.json(produto);
+  const p = produtos.find(x => x.id === Number(req.params.id));
+  if (!p) return res.status(404).json({ message: "Produto não encontrado" });
+  res.json(p);
 });
 
-// Criar produto
-router.post('/', (req, res) => {
-  const { nome, valor, quantidade } = req.body;
-  const novoProduto = { id: produtos.length + 1, nome, valor, quantidade };
-  produtos.push(novoProduto);
-  res.status(201).json(novoProduto);
+// criar (admin)
+router.post('/', authMiddleware, authorizeRoles(['admin']), (req, res) => {
+  const { nome, preco, descricao } = req.body;
+  const novo = { id: ++lastId, nome, preco, descricao };
+  produtos.push(novo);
+  res.status(201).json(novo);
 });
 
-// Atualizar produto
-router.put('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const produto = produtos.find(p => p.id === id);
-  if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-
-  produto.nome = req.body.nome ?? produto.nome;
-  produto.valor = req.body.valor ?? produto.valor;
-  produto.quantidade = req.body.quantidade ?? produto.quantidade;
-
-  res.json(produto);
+// atualizar (admin)
+router.put('/:id', authMiddleware, authorizeRoles(['admin']), (req, res) => {
+  const idx = produtos.findIndex(x => x.id === Number(req.params.id));
+  if (idx === -1) return res.status(404).json({ message: "Produto não encontrado" });
+  Object.assign(produtos[idx], req.body);
+  res.json(produtos[idx]);
 });
 
-// Excluir produto
-router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  produtos = produtos.filter(p => p.id !== id);
-  res.status(204).send();
+// deletar (admin)
+router.delete('/:id', authMiddleware, authorizeRoles(['admin']), (req, res) => {
+  const idx = produtos.findIndex(x => x.id === Number(req.params.id));
+  if (idx === -1) return res.status(404).json({ message: "Produto não encontrado" });
+  produtos.splice(idx, 1);
+  res.json({ message: "Produto excluído" });
 });
 
 module.exports = router;

@@ -1,46 +1,55 @@
 const express = require('express');
-const router = express.Router();
-let usuarios = require('../data/usuarios');
+const bcrypt = require('bcrypt');
+const { authMiddleware, authorizeRoles } = require('../middleware/auth');
+const usuariosStore = require('../store/usuariosStore');
 
-// Listar usuários
-router.get('/', (req, res) => {
-  res.json(usuarios);
+const router = express.Router();
+
+// Listar usuários (admin)
+router.get('/', authMiddleware, authorizeRoles(['admin']), (req, res) => {
+  res.json(usuariosStore.findAll());
 });
 
-// Buscar usuário por ID
-router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const usuario = usuarios.find(u => u.id === id);
-  if (!usuario) return res.status(404).json({ erro: "Usuário não encontrado" });
+// Buscar usuário por ID (admin ou o próprio)
+router.get('/:id', authMiddleware, (req, res) => {
+  const { id } = req.params;
+  if (req.user.role !== "admin" && req.user.id !== Number(id)) {
+    return res.status(403).json({ message: "Acesso negado" });
+  }
+  const usuario = usuariosStore.findById(id);
+  if (!usuario) return res.status(404).json({ message: "Usuário não encontrado" });
   res.json(usuario);
 });
 
 // Criar usuário
-router.post('/', (req, res) => {
-  const { nome, senha, tipo } = req.body;
-  const novoUsuario = { id: usuarios.length + 1, nome, senha, tipo: tipo || "cliente" };
-  usuarios.push(novoUsuario);
+router.post('/', async (req, res) => {
+  const { nome, email, senha, role } = req.body;
+  if (!nome || !email || !senha) return res.status(400).json({ message: "Dados incompletos" });
+  if (usuariosStore.findByEmail(email)) return res.status(409).json({ message: "Email já cadastrado" });
+
+  const hashed = await bcrypt.hash(senha, 10);
+  const novoUsuario = usuariosStore.create({ nome, email, senha: hashed, role });
   res.status(201).json(novoUsuario);
 });
 
-// Atualizar usuário
-router.put('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const usuario = usuarios.find(u => u.id === id);
-  if (!usuario) return res.status(404).json({ erro: "Usuário não encontrado" });
-
-  usuario.nome = req.body.nome ?? usuario.nome;
-  usuario.senha = req.body.senha ?? usuario.senha;
-  usuario.tipo = req.body.tipo ?? usuario.tipo;
-
-  res.json(usuario);
+// Atualizar usuário (admin ou próprio)
+router.put('/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  if (req.user.role !== "admin" && req.user.id !== Number(id)) {
+    return res.status(403).json({ message: "Acesso negado" });
+  }
+  let { nome, email, senha, role } = req.body;
+  if (senha) senha = await bcrypt.hash(senha, 10);
+  const atualizado = usuariosStore.update(id, { nome, email, senha, role });
+  if (!atualizado) return res.status(404).json({ message: "Usuário não encontrado" });
+  res.json(atualizado);
 });
 
-// Excluir usuário
-router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  usuarios = usuarios.filter(u => u.id !== id);
-  res.status(204).send();
+// Excluir usuário (admin)
+router.delete('/:id', authMiddleware, authorizeRoles(['admin']), (req, res) => {
+  const { id } = req.params;
+  if (!usuariosStore.remove(id)) return res.status(404).json({ message: "Usuário não encontrado" });
+  res.json({ message: "Usuário excluído" });
 });
 
 module.exports = router;
